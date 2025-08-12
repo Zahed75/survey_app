@@ -3,41 +3,34 @@ import 'package:get_storage/get_storage.dart';
 import '../services/auth_service.dart';
 
 class SurveyRepository {
-  final Dio _dio = Dio();
-  final String _endpoint =
-      'https://survey-backend.shwapno.app/survey/api/surveys/user/';
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 30),
+  ));
 
-  /// Method to fetch user surveys with filtering by site code
+  static const String _base = 'https://survey-backend.shwapno.app';
+  final _box = GetStorage();
 
+  String? get _token => AuthService.instance.getToken();
 
+  /// Uses new optimized API. If a site is selected, sends `?site_code=...`
   Future<List<dynamic>> fetchUserSurveys() async {
-    final token = AuthService.instance.getToken();
-    final siteCode = GetStorage().read('selected_site_code') ?? '';
-
-    final url = 'https://survey-backend.shwapno.app/survey/api/user/accessible-sites/';
-
-    final response = await Dio().get(
-      url,
+    final siteCode = (_box.read('selected_site_code') as String?)?.trim();
+    final resp = await _dio.get(
+      '$_base/survey/api/survey_by_user/',
+      queryParameters:
+      (siteCode != null && siteCode.isNotEmpty) ? {'site_code': siteCode} : null,
       options: Options(headers: {
-        'Authorization': 'Bearer $token',
+        'Authorization': 'Bearer $_token',
+        'Accept': 'application/json',
       }),
     );
 
-    final data = response.data['data'] as List<dynamic>;
+    if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
+      final data = (resp.data as Map<String, dynamic>)['data'];
+      if (data is List) return List<dynamic>.from(data);
+    }
 
-    // Split the selected site_code and check if any of the codes match
-    final selectedSiteCodes = siteCode.split(',').map((e) => e.trim()).toSet();
-
-    final filtered = data.where((e) {
-      // Ensure e['site_code'] is a String and handle it properly
-      final surveySiteCodes = (e['site_code'] as String?)?.split(',').map((code) => code.trim()).toSet() ?? <String>{};
-
-      // Ensure that the filtering returns a boolean value (true or false)
-      return surveySiteCodes.any((code) => selectedSiteCodes.contains(code));
-    }).toList();
-
-    return filtered;
+    throw Exception('Failed to load surveys');
   }
-
-
 }

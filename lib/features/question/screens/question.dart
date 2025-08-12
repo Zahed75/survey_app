@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:get/get.dart';
 import 'package:survey_app/features/question/screens/result.dart';
@@ -327,6 +328,99 @@ class _QuestionScreenState extends State<QuestionScreen> {
     return true;
   }
 
+  // Future<void> submitSurvey() async {
+  //   if (isSubmitting) return;
+  //
+  //   final questions = widget.surveyData['questions'] as List;
+  //
+  //   // ✅ required validation
+  //   if (!_validateRequired(questions)) return;
+  //
+  //   setState(() => isSubmitting = true);
+  //
+  //   final questionResponses = <Map<String, dynamic>>[];
+  //
+  //   for (int i = 0; i < questions.length; i++) {
+  //     final q = questions[i];
+  //     final id = q['id'];
+  //     final type = q['type'];
+  //
+  //     final entry = {"question": id};
+  //
+  //     // ✅ yes/no: send only the selected choice id
+  //     if (type == 'yesno' && controller.answers.containsKey(id)) {
+  //       entry["selected_choice"] = {
+  //         "id": controller.answers[id],
+  //       };
+  //     }
+  //     // ✅ choice (MCQ): send only id
+  //     else if (type == 'choice' && controller.answers.containsKey(id)) {
+  //       entry["selected_choice"] = {
+  //         "id": controller.answers[id],
+  //       };
+  //     }
+  //     // ✅ multiple_scoring: send only id
+  //     else if (type == 'multiple_scoring' &&
+  //         controller.answers.containsKey(id)) {
+  //       entry["selected_choice"] = {
+  //         "id": controller.answers[id],
+  //       };
+  //     } else if (type == 'image' && controller.uploadedImages[id] != null) {
+  //       entry["image"] = await _encodeImageToBase64(
+  //         controller.uploadedImages[id]!,
+  //       );
+  //     } else if (type == 'location' &&
+  //         controller.detectedLocations[id] != null) {
+  //       entry["location"] = {
+  //         "lat": controller.detectedLocations[id]!["latitude"],
+  //         "lon": controller.detectedLocations[id]!["longitude"],
+  //       };
+  //     } else if ((type == 'text' || type == 'remarks') &&
+  //         controller.answers[id]?.isNotEmpty == true) {
+  //       entry["answer_text"] = controller.answers[id];
+  //     } else if (type == 'linear' && controller.answers[id] != null) {
+  //       entry["linear_value"] = controller.answers[id];
+  //     }
+  //
+  //     questionResponses.add(entry);
+  //   }
+  //
+  //   final body = jsonEncode({
+  //     "survey": widget.surveyData['id'],
+  //     "location_lat": controller.latitude.value.toString(),
+  //     "location_lon": controller.longitude.value.toString(),
+  //     "question_responses": questionResponses,
+  //   });
+  //
+  //   try {
+  //     final res = await http.post(
+  //       Uri.parse(
+  //         "https://survey-backend.shwapno.app/survey/api/survey/submit-response/",
+  //       ),
+  //       headers: {
+  //         "Authorization": "Bearer ${Get.find<AuthService>().getToken()}",
+  //         "Content-Type": "application/json",
+  //       },
+  //       body: body,
+  //     );
+  //
+  //     if (res.statusCode == 200 || res.statusCode == 201) {
+  //       // ✅ clear state so returning shows a fresh form
+  //       controller.resetAll();
+  //
+  //       final responseJson = jsonDecode(res.body);
+  //       final responseId = responseJson['response_id'];
+  //       Get.to(() => ResultScreen(responseId: responseId));
+  //     } else {
+  //       Get.snackbar("Error", "Error submitting survey: ${res.statusCode}");
+  //     }
+  //   } catch (e) {
+  //     Get.snackbar("Error", "Error submitting survey: $e");
+  //   } finally {
+  //     if (mounted) setState(() => isSubmitting = false);
+  //   }
+  // }
+
   Future<void> submitSurvey() async {
     if (isSubmitting) return;
 
@@ -359,33 +453,45 @@ class _QuestionScreenState extends State<QuestionScreen> {
         };
       }
       // ✅ multiple_scoring: send only id
-      else if (type == 'multiple_scoring' &&
-          controller.answers.containsKey(id)) {
+      else if (type == 'multiple_scoring' && controller.answers.containsKey(id)) {
         entry["selected_choice"] = {
           "id": controller.answers[id],
         };
-      } else if (type == 'image' && controller.uploadedImages[id] != null) {
+      }
+      // ✅ image as base64
+      else if (type == 'image' && controller.uploadedImages[id] != null) {
         entry["image"] = await _encodeImageToBase64(
           controller.uploadedImages[id]!,
         );
-      } else if (type == 'location' &&
-          controller.detectedLocations[id] != null) {
+      }
+      // ✅ per-question location
+      else if (type == 'location' && controller.detectedLocations[id] != null) {
         entry["location"] = {
           "lat": controller.detectedLocations[id]!["latitude"],
           "lon": controller.detectedLocations[id]!["longitude"],
         };
-      } else if ((type == 'text' || type == 'remarks') &&
+      }
+      // ✅ text / remarks
+      else if ((type == 'text' || type == 'remarks') &&
           controller.answers[id]?.isNotEmpty == true) {
         entry["answer_text"] = controller.answers[id];
-      } else if (type == 'linear' && controller.answers[id] != null) {
+      }
+      // ✅ linear
+      else if (type == 'linear' && controller.answers[id] != null) {
         entry["linear_value"] = controller.answers[id];
       }
 
       questionResponses.add(entry);
     }
 
+    // ✅ Include the selected site_code (fixes wrong site in result)
+    final selectedSiteCode =
+        GetStorage().read('selected_site_code') ??
+            (widget.surveyData['site_code'] ?? '');
+
     final body = jsonEncode({
       "survey": widget.surveyData['id'],
+      "site_code": selectedSiteCode, // ✅ IMPORTANT
       "location_lat": controller.latitude.value.toString(),
       "location_lon": controller.longitude.value.toString(),
       "question_responses": questionResponses,
@@ -409,6 +515,10 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
         final responseJson = jsonDecode(res.body);
         final responseId = responseJson['response_id'];
+
+        // (Optional helper for later reads; doesn’t affect UI/UX)
+        GetStorage().write('response_site_code_$responseId', selectedSiteCode);
+
         Get.to(() => ResultScreen(responseId: responseId));
       } else {
         Get.snackbar("Error", "Error submitting survey: ${res.statusCode}");

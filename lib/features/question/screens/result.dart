@@ -19,14 +19,19 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen> {
   final controller = Get.put(SurveyResultController());
 
+  // result.dart (ResultScreen)
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 1) Try to show cached result instantly
+      await controller.loadCachedResult(widget.responseId);
+      // 2) Then refresh in background
       await controller.loadResult(widget.responseId);
       GetStorage().write('last_response_id', widget.responseId);
     });
   }
+
 
   @override
   void dispose() {
@@ -63,7 +68,7 @@ class _ResultScreenState extends State<ResultScreen> {
 
           final data = controller.result.value;
           if (data == null) {
-            return const Center(child: Text("❌ Failed to load survey result"));
+            return const Center(child: Text("Failed to load survey result"));
           }
 
           final totalScore = data.overall.obtainedMarks;
