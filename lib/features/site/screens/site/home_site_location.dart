@@ -76,6 +76,7 @@ class HomeSiteLocation extends StatelessWidget {
               else
                 Expanded(
                   child: GridView.builder(
+                    controller: controller.scrollController,
                     itemCount: sites.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
