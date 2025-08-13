@@ -154,7 +154,7 @@ class SiteController extends GetxController {
   }
 
   /// When user searches e.g. "D016" and it's not in the loaded pages yet,
-  /// progressively load more pages (with same page size) until:
+  /// progressively load more pages (with same page size) until:x
   ///  - we find at least one match, or
   ///  - we run out of pages.
   Future<void> _fetchAheadUntilMatchedOrExhausted(String q) async {
@@ -195,10 +195,20 @@ class SiteController extends GetxController {
     }
   }
 
+  // Future<void> setSelectedSite(String code) async {
+  //   selectedSiteCode.value = code;
+  //   await storage.write('selected_site_code', code);
+  // }
+
+
+  // site_controller.dart
   Future<void> setSelectedSite(String code) async {
-    selectedSiteCode.value = code;
-    await storage.write('selected_site_code', code);
+    final normalized = (code).toString().trim().toUpperCase();
+    selectedSiteCode.value = normalized;
+    await storage.write('selected_site_code', normalized);
   }
+
+
 
   /// Back-compat for old calls (no-op now)
   Future<void> fetchAssignedSitesFromToken() async {
