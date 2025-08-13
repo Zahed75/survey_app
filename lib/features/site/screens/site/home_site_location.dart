@@ -94,13 +94,34 @@ class HomeSiteLocation extends StatelessWidget {
 
 
                       return GestureDetector(
-                        onTap: () {
-                          controller.setSelectedSite(siteCode);
-                          controller.storage.write('selected_site_name', siteName);
-                          NavigationController.instance.resetToHome();
-                          Get.offAll(() => const NavigationMenu());
-                        },
-                        child: Container(
+                        // onTap: () {
+                        //   controller.setSelectedSite(siteCode);
+                        //   controller.storage.write('selected_site_name', siteName);
+                        //   NavigationController.instance.resetToHome();
+                        //   Get.offAll(() => const NavigationMenu());
+                        // },
+
+                        // HomeSiteLocation.dart (inside itemBuilder -> onTap)
+                          onTap: () async {
+                            debugPrint('[HomeSiteLocation] TAP site_code=$siteCode, name="$siteName"');
+
+                            // ✅ make sure storage is written before we navigate
+                            await controller.setSelectedSite(siteCode);
+                            await controller.storage.write('selected_site_name', siteName);
+
+                            // read-back & log (sanity)
+                            final readBack = controller.storage.read('selected_site_code');
+                            debugPrint('[HomeSiteLocation] wrote selected_site_code="$readBack"');
+
+                            NavigationController.instance.resetToHome();
+                            debugPrint('[HomeSiteLocation] navigating -> NavigationMenu');
+                            Get.offAll(() => const NavigationMenu());
+                          },
+
+
+
+
+                          child: Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: Colors.white,

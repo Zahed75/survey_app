@@ -41,28 +41,71 @@ class _HomeScreenState extends State<HomeScreen> {
     fetchSurveys();
   }
 
+  // void _loadSiteCode() {
+  //   siteCode = storage.read('selected_site_code') ?? 'Unknown Site';
+  // }
+  //
+  // Future<void> fetchSurveys() async {
+  //   setState(() => isLoading = true);
+  //   await controller.fetchSurveys();
+  //   if (!mounted) return;
+  //   setState(() {
+  //     surveys = controller.surveys; // RxList -> List
+  //     isLoading = false;
+  //   });
+  // }
+  //
+  // Future<void> _selectSite() async {
+  //   await Get.to(() => const HomeSiteLocation(isSelectionMode: true));
+  //   final updatedCode = storage.read('selected_site_code');
+  //   if (updatedCode != null) {
+  //     setState(() => siteCode = updatedCode);
+  //     await fetchSurveys(); // reload with ?site_code=...
+  //   }
+  // }
+
+
+  // home.dart
+
   void _loadSiteCode() {
-    siteCode = storage.read('selected_site_code') ?? 'Unknown Site';
+    final stored = storage.read('selected_site_code');
+    siteCode = stored ?? 'Unknown Site';
+    debugPrint('[HomeScreen] _loadSiteCode stored="$stored" (display="$siteCode")');
   }
 
   Future<void> fetchSurveys() async {
     setState(() => isLoading = true);
+    final stored = storage.read('selected_site_code');
+    debugPrint('[HomeScreen] fetchSurveys() start, storage.selected_site_code="$stored" '
+        '(display="$siteCode")');
+
     await controller.fetchSurveys();
+
     if (!mounted) return;
     setState(() {
       surveys = controller.surveys; // RxList -> List
       isLoading = false;
     });
+    debugPrint('[HomeScreen] fetchSurveys() done: count=${surveys.length}');
   }
 
+// When returning from picker, log what changed
   Future<void> _selectSite() async {
+    debugPrint('[HomeScreen] opening HomeSiteLocation…');
     await Get.to(() => const HomeSiteLocation(isSelectionMode: true));
+
     final updatedCode = storage.read('selected_site_code');
+    debugPrint('[HomeScreen] returned from HomeSiteLocation, updatedCode="$updatedCode"');
+
     if (updatedCode != null) {
       setState(() => siteCode = updatedCode);
-      await fetchSurveys(); // reload with ?site_code=...
+      debugPrint('[HomeScreen] set display siteCode="$siteCode"; fetching surveys…');
+      await fetchSurveys();
+    } else {
+      debugPrint('[HomeScreen] no updatedCode; skipping fetchSurveys');
     }
   }
+
 
   // ... (update code helpers unchanged)
 

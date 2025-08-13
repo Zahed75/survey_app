@@ -99,59 +99,134 @@ class SiteController extends GetxController {
     }
   }
 
+  // Future<void> _fetchPage() async {
+  //   try {
+  //     if (_page == 1) isLoading.value = true;
+  //
+  //     final token = storage.read('access_token');
+  //     if (token == null || token.toString().isEmpty) {
+  //       assignedSites.clear();
+  //       _hasMore = false;
+  //       return;
+  //     }
+  //
+  //     final resp = await _dio.get(
+  //       '/api/user/get_site_access_by_user',
+  //       queryParameters: {
+  //         'page': _page,
+  //         'page_size': _kPageSize, // <-- CONSTANT page size (no skipping)
+  //       },
+  //       options: Options(
+  //         headers: {
+  //           'Authorization': 'Bearer $token',
+  //           'Accept': 'application/json',
+  //         },
+  //       ),
+  //     );
+  //
+  //     if (resp.statusCode == 200 && resp.data is Map) {
+  //       final map = resp.data as Map;
+  //       final List sites = (map['sites'] ?? []) as List;
+  //       _numPages = (map['num_pages'] ?? 1) as int;
+  //
+  //       // De-dup by site_code (handles back/forward navigation)
+  //       final existing = {
+  //         for (var s in assignedSites) (s['site_code']?.toString() ?? ''): s,
+  //       };
+  //
+  //       for (final raw in sites) {
+  //         if (raw is Map && raw['site_code'] != null) {
+  //           final code = raw['site_code'].toString();
+  //           existing[code] = Map<String, dynamic>.from(raw);
+  //         }
+  //       }
+  //
+  //       assignedSites.value = existing.values.toList();
+  //       _hasMore = _page < _numPages;
+  //     } else {
+  //       _hasMore = false; // stop trying on non-200
+  //     }
+  //   } catch (_) {
+  //     _hasMore = false; // fail safe
+  //   } finally {
+  //     if (_page == 1) isLoading.value = false;
+  //   }
+  // }
+
+
+
+  // site_controller.dart
+
   Future<void> _fetchPage() async {
     try {
       if (_page == 1) isLoading.value = true;
 
       final token = storage.read('access_token');
+      debugPrint('[SiteController] _fetchPage page=$_page size=$_kPageSize '
+          'tokenPresent=${token != null && token.toString().isNotEmpty}');
+
       if (token == null || token.toString().isEmpty) {
         assignedSites.clear();
         _hasMore = false;
+        debugPrint('[SiteController] no token -> stop');
         return;
       }
 
       final resp = await _dio.get(
         '/api/user/get_site_access_by_user',
-        queryParameters: {
-          'page': _page,
-          'page_size': _kPageSize, // <-- CONSTANT page size (no skipping)
-        },
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Accept': 'application/json',
-          },
-        ),
+        queryParameters: {'page': _page, 'page_size': _kPageSize},
+        options: Options(headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        }),
       );
+
+      debugPrint('[SiteController] response status=${resp.statusCode}');
 
       if (resp.statusCode == 200 && resp.data is Map) {
         final map = resp.data as Map;
         final List sites = (map['sites'] ?? []) as List;
         _numPages = (map['num_pages'] ?? 1) as int;
 
-        // De-dup by site_code (handles back/forward navigation)
+        debugPrint('[SiteController] got ${sites.length} sites '
+            '(now have=${assignedSites.length}) num_pages=$_numPages');
+
         final existing = {
           for (var s in assignedSites) (s['site_code']?.toString() ?? ''): s,
         };
-
         for (final raw in sites) {
           if (raw is Map && raw['site_code'] != null) {
             final code = raw['site_code'].toString();
             existing[code] = Map<String, dynamic>.from(raw);
           }
         }
-
         assignedSites.value = existing.values.toList();
         _hasMore = _page < _numPages;
+        debugPrint('[SiteController] merged -> total=${assignedSites.length} '
+            'hasMore=$_hasMore');
       } else {
-        _hasMore = false; // stop trying on non-200
+        _hasMore = false;
+        debugPrint('[SiteController] non-200 -> stop paging');
       }
-    } catch (_) {
-      _hasMore = false; // fail safe
+    } catch (e) {
+      _hasMore = false;
+      debugPrint('[SiteController] _fetchPage error: $e');
     } finally {
       if (_page == 1) isLoading.value = false;
     }
   }
+
+// selection write with logging
+  Future<void> setSelectedSite(String code) async {
+    final normalized = (code).toString().trim().toUpperCase();
+    debugPrint('[SiteController] setSelectedSite request="$code" -> "$normalized"');
+    selectedSiteCode.value = normalized;
+    await storage.write('selected_site_code', normalized);
+    final rb = storage.read('selected_site_code');
+    debugPrint('[SiteController] setSelectedSite wrote="$rb"');
+  }
+
+
 
   /// When user searches e.g. "D016" and it's not in the loaded pages yet,
   /// progressively load more pages (with same page size) until:x
@@ -202,11 +277,11 @@ class SiteController extends GetxController {
 
 
   // site_controller.dart
-  Future<void> setSelectedSite(String code) async {
-    final normalized = (code).toString().trim().toUpperCase();
-    selectedSiteCode.value = normalized;
-    await storage.write('selected_site_code', normalized);
-  }
+  // Future<void> setSelectedSite(String code) async {
+  //   final normalized = (code).toString().trim().toUpperCase();
+  //   selectedSiteCode.value = normalized;
+  //   await storage.write('selected_site_code', normalized);
+  // }
 
 
 
