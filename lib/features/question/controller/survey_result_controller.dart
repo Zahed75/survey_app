@@ -18,29 +18,117 @@ class SurveyResultController extends GetxController {
   final isSurveyDisabled = false.obs;
 
   // ---- Helpers for per-id cache ----
+  // String _cacheKeyFor(int id) => 'result_$id';
+  //
+  // Future<bool> loadCachedResult(int responseId) async {
+  //   try {
+  //     final cached = _storage.read(_cacheKeyFor(responseId));
+  //     if (cached != null) {
+  //       final map = jsonDecode(cached) as Map<String, dynamic>;
+  //       final data = SurveyResult.fromJson(map);
+  //       result.value = data;
+  //       return true;
+  //     }
+  //   } catch (_) {}
+  //   return false;
+  // }
+  //
+  //
+  //
+  // // survey_result_controller.dart
+  // Future<void> loadResult(int responseId, {bool updateCache = true}) async {
+  //   // local keys so you don't need extra class fields
+  //   const String cacheKeyLocal = 'last_survey_result';
+  //   final String responseSiteKey = 'response_site_code_$responseId';
+  //   final String responseSiteNameKey = 'response_site_name_$responseId'; //
+  //
+  //   try {
+  //     isLoading.value = true;
+  //
+  //     // 1) Fetch result from API
+  //     final data = await _repo.fetchResultByCategory(responseId);
+  //
+  //     // 2) Rename "Uncategorized" -> "General" (keeps your UX)
+  //     final updatedCategories = data.categories.map((category) {
+  //       if (category.name == "Uncategorized") {
+  //         return CategoryResult(
+  //           name: "General",
+  //           obtainedMarks: category.obtainedMarks,
+  //           totalMarks: category.totalMarks,
+  //           percentage: category.percentage,
+  //           questions: category.questions,
+  //         );
+  //       }
+  //       return category;
+  //     }).toList();
+  //
+  //     // 3) Prefer the site_code captured at submit time for this response
+  //     final savedSiteCode = _storage.read(responseSiteKey);
+  //     final savedSiteName = _storage.read(responseSiteNameKey);
+  //     final String? effectiveSiteCode = (savedSiteCode is String && savedSiteCode.trim().isNotEmpty)
+  //         ? savedSiteCode.trim()
+  //         : data.siteCode;
+  //
+  //     final String? effectiveSiteName =
+  //     (savedSiteName is String && savedSiteName.trim().isNotEmpty)
+  //         ? savedSiteName.trim()
+  //         : data.siteName;
+  //
+  //     // 4) Build the final model (only swapping the siteCode)
+  //     final patched = SurveyResult(
+  //       responseId: data.responseId,
+  //       surveyTitle: data.surveyTitle,
+  //       submittedByUserId: data.submittedByUserId,
+  //       submittedAt: data.submittedAt,
+  //       overall: data.overall,
+  //       categories: updatedCategories,
+  //       siteCode: effectiveSiteCode,   // fixed site code source
+  //       siteName: effectiveSiteName,
+  //       timestamp: data.timestamp,
+  //     );
+  //     print(patched.siteName);
+  //     // 5) Set reactive value so UI updates immediately
+  //     result.value = patched;
+  //
+  //     // 6) Cache (optional)
+  //     if (updateCache) {
+  //       _storage.write(
+  //         cacheKeyLocal,
+  //         jsonEncode({"responseId": responseId, "data": patched.toJson()}),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     // Show the same UX message you use elsewhere
+  //     Get.snackbar("Error", "Failed to load result");
+  //   } finally {
+  //     isLoading.value = false;
+  //   }
+  // }
+
+
+
+
+  // ---- Helpers for per-id cache ----
   String _cacheKeyFor(int id) => 'result_$id';
 
+// Read a per-id cached result if present.
+// Does NOT toggle isLoading (so the spinner is controlled by the caller).
   Future<bool> loadCachedResult(int responseId) async {
     try {
       final cached = _storage.read(_cacheKeyFor(responseId));
-      if (cached != null) {
+      if (cached != null && cached is String && cached.isNotEmpty) {
         final map = jsonDecode(cached) as Map<String, dynamic>;
-        final data = SurveyResult.fromJson(map);
-        result.value = data;
+        result.value = SurveyResult.fromJson(map);
         return true;
       }
     } catch (_) {}
     return false;
   }
 
-
-
-  // survey_result_controller.dart
   Future<void> loadResult(int responseId, {bool updateCache = true}) async {
-    // local keys so you don't need extra class fields
-    const String cacheKeyLocal = 'last_survey_result';
+    const String lastCacheKey = 'last_survey_result';
     final String responseSiteKey = 'response_site_code_$responseId';
-    final String responseSiteNameKey = 'response_site_name_$responseId'; //
+    final String responseSiteNameKey = 'response_site_name_$responseId';
 
     try {
       isLoading.value = true;
@@ -48,24 +136,26 @@ class SurveyResultController extends GetxController {
       // 1) Fetch result from API
       final data = await _repo.fetchResultByCategory(responseId);
 
-      // 2) Rename "Uncategorized" -> "General" (keeps your UX)
-      final updatedCategories = data.categories.map((category) {
-        if (category.name == "Uncategorized") {
+      // 2) Rename "Uncategorized" -> "General"
+      final updatedCategories = data.categories.map((c) {
+        if (c.name == "Uncategorized") {
           return CategoryResult(
             name: "General",
-            obtainedMarks: category.obtainedMarks,
-            totalMarks: category.totalMarks,
-            percentage: category.percentage,
-            questions: category.questions,
+            obtainedMarks: c.obtainedMarks,
+            totalMarks: c.totalMarks,
+            percentage: c.percentage,
+            questions: c.questions,
           );
         }
-        return category;
+        return c;
       }).toList();
 
-      // 3) Prefer the site_code captured at submit time for this response
+      // 3) Prefer submitted site code/name captured at submit time
       final savedSiteCode = _storage.read(responseSiteKey);
       final savedSiteName = _storage.read(responseSiteNameKey);
-      final String? effectiveSiteCode = (savedSiteCode is String && savedSiteCode.trim().isNotEmpty)
+
+      final String? effectiveSiteCode =
+      (savedSiteCode is String && savedSiteCode.trim().isNotEmpty)
           ? savedSiteCode.trim()
           : data.siteCode;
 
@@ -74,7 +164,7 @@ class SurveyResultController extends GetxController {
           ? savedSiteName.trim()
           : data.siteName;
 
-      // 4) Build the final model (only swapping the siteCode)
+      // 4) Build final model
       final patched = SurveyResult(
         responseId: data.responseId,
         surveyTitle: data.surveyTitle,
@@ -82,28 +172,36 @@ class SurveyResultController extends GetxController {
         submittedAt: data.submittedAt,
         overall: data.overall,
         categories: updatedCategories,
-        siteCode: effectiveSiteCode,   // fixed site code source
+        siteCode: effectiveSiteCode,
         siteName: effectiveSiteName,
         timestamp: data.timestamp,
       );
-      print(patched.siteName);
-      // 5) Set reactive value so UI updates immediately
+
+      // 5) Update UI
       result.value = patched;
 
-      // 6) Cache (optional)
+      // 6) Cache consistently
       if (updateCache) {
+        // per-id cache (used by loadCachedResult)
+        _storage.write(_cacheKeyFor(responseId), jsonEncode(patched.toJson()));
+
+        // optional: keep your legacy "last" cache too (harmless)
         _storage.write(
-          cacheKeyLocal,
+          lastCacheKey,
           jsonEncode({"responseId": responseId, "data": patched.toJson()}),
         );
       }
     } catch (e) {
-      // Show the same UX message you use elsewhere
-      Get.snackbar("Error", "Failed to load result");
+      // Only show error if we truly have nothing to display
+      if (result.value == null) {
+        Get.snackbar("Error", "Failed to load result");
+      }
     } finally {
       isLoading.value = false;
     }
   }
+
+
 
   Future<void> checkLocationAndEnableSurvey() async {
     final Position position = await Geolocator.getCurrentPosition();

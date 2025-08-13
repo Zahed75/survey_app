@@ -20,14 +20,33 @@ class _ResultScreenState extends State<ResultScreen> {
   final controller = Get.put(SurveyResultController());
 
   // result.dart (ResultScreen)
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   WidgetsBinding.instance.addPostFrameCallback((_) async {
+  //     // 1) Try to show cached result instantly
+  //     await controller.loadCachedResult(widget.responseId);
+  //     // 2) Then refresh in background
+  //     await controller.loadResult(widget.responseId);
+  //     GetStorage().write('last_response_id', widget.responseId);
+  //   });
+  // }
+
+
+  // in _ResultScreenState.initState()
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 1) Try to show cached result instantly
+      // <- make sure the first build doesn't show the error state
+      controller.isLoading.value = true;
+
+      // 1) show cached (if any)
       await controller.loadCachedResult(widget.responseId);
-      // 2) Then refresh in background
+
+      // 2) then refresh from API
       await controller.loadResult(widget.responseId);
+
       GetStorage().write('last_response_id', widget.responseId);
     });
   }
