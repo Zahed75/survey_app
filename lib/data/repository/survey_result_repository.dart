@@ -29,7 +29,7 @@ class SurveyResultRepository {
 
       return SurveyResult.fromJson(response.data);
     } catch (e, stacktrace) {
-      print("❌ [SurveyResultRepository] Error: $e");
+      print(" [SurveyResultRepository] Error: $e");
       print("🪜 Stacktrace: $stacktrace");
       throw Exception("Failed to load survey result.");
     }

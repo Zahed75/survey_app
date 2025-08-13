@@ -483,15 +483,24 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
       questionResponses.add(entry);
     }
-
+    final box = GetStorage();
     // ✅ Include the selected site_code (fixes wrong site in result)
     final selectedSiteCode =
         GetStorage().read('selected_site_code') ??
             (widget.surveyData['site_code'] ?? '');
 
+
+    // Try to get name from storage/survey
+    String? selectedSiteName =
+        box.read('selected_site_name') ??
+            widget.surveyData['site_name'] ??
+            widget.surveyData['siteName'];
+
+
     final body = jsonEncode({
       "survey": widget.surveyData['id'],
       "site_code": selectedSiteCode, // ✅ IMPORTANT
+
       "location_lat": controller.latitude.value.toString(),
       "location_lon": controller.longitude.value.toString(),
       "question_responses": questionResponses,
@@ -515,6 +524,16 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
         final responseJson = jsonDecode(res.body);
         final responseId = responseJson['response_id'];
+
+
+        // Condition Check
+        // ✅ Persist both code & name against this response so Result uses the exact outlet you submitted
+        if (selectedSiteCode is String && selectedSiteCode.trim().isNotEmpty) {
+          box.write('response_site_code_$responseId', selectedSiteCode.trim());
+        }
+        if (selectedSiteName is String && selectedSiteName.toString().trim().isNotEmpty) {
+          box.write('response_site_name_$responseId', selectedSiteName.toString().trim());
+        }
 
         // (Optional helper for later reads; doesn’t affect UI/UX)
         GetStorage().write('response_site_code_$responseId', selectedSiteCode);

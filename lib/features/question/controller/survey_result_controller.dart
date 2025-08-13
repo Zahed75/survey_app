@@ -40,6 +40,7 @@ class SurveyResultController extends GetxController {
     // local keys so you don't need extra class fields
     const String cacheKeyLocal = 'last_survey_result';
     final String responseSiteKey = 'response_site_code_$responseId';
+    final String responseSiteNameKey = 'response_site_name_$responseId'; //
 
     try {
       isLoading.value = true;
@@ -63,9 +64,15 @@ class SurveyResultController extends GetxController {
 
       // 3) Prefer the site_code captured at submit time for this response
       final savedSiteCode = _storage.read(responseSiteKey);
+      final savedSiteName = _storage.read(responseSiteNameKey);
       final String? effectiveSiteCode = (savedSiteCode is String && savedSiteCode.trim().isNotEmpty)
           ? savedSiteCode.trim()
           : data.siteCode;
+
+      final String? effectiveSiteName =
+      (savedSiteName is String && savedSiteName.trim().isNotEmpty)
+          ? savedSiteName.trim()
+          : data.siteName;
 
       // 4) Build the final model (only swapping the siteCode)
       final patched = SurveyResult(
@@ -75,11 +82,11 @@ class SurveyResultController extends GetxController {
         submittedAt: data.submittedAt,
         overall: data.overall,
         categories: updatedCategories,
-        siteCode: effectiveSiteCode,   // ✅ fixed site code source
-        siteName: data.siteName,       // (leave as-is)
+        siteCode: effectiveSiteCode,   // fixed site code source
+        siteName: effectiveSiteName,
         timestamp: data.timestamp,
       );
-
+      print(patched.siteName);
       // 5) Set reactive value so UI updates immediately
       result.value = patched;
 
