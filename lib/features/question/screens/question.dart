@@ -410,42 +410,111 @@ class _QuestionScreenState extends State<QuestionScreen> {
       "question_responses": questionResponses,
     });
 
+
+
+    // try {
+    //   final res = await http.post(
+    //     Uri.parse(
+    //       "https://survey-backend.shwapno.app/survey/api/survey/submit-response/",
+    //     ),
+    //     headers: {
+    //       "Authorization": "Bearer ${Get.find<AuthService>().getToken()}",
+    //       "Content-Type": "application/json",
+    //     },
+    //     body: body,
+    //   );
+    //
+    //   if (res.statusCode == 200 || res.statusCode == 201) {
+    //     // ✅ clear state so returning shows a fresh form
+    //     controller.resetAll();
+    //
+    //     final responseJson = jsonDecode(res.body);
+    //     final responseId = responseJson['response_id'];
+    //
+    //     // Condition Check
+    //     // ✅ Persist both code & name against this response so Result uses the exact outlet you submitted
+    //     if (selectedSiteCode is String && selectedSiteCode.trim().isNotEmpty) {
+    //       box.write('response_site_code_$responseId', selectedSiteCode.trim());
+    //     }
+    //     if (selectedSiteName is String &&
+    //         selectedSiteName.toString().trim().isNotEmpty) {
+    //       box.write(
+    //         'response_site_name_$responseId',
+    //         selectedSiteName.toString().trim(),
+    //       );
+    //     }
+    //
+    //     // (Optional helper for later reads; doesn’t affect UI/UX)
+    //     GetStorage().write('response_site_code_$responseId', selectedSiteCode);
+    //
+    //     Get.to(() => ResultScreen(responseId: responseId));
+    //   } else {
+    //     Get.snackbar("Error", "Error submitting survey: ${res.statusCode}");
+    //   }
+    // } catch (e) {
+    //   Get.snackbar("Error", "Error submitting survey: $e");
+    // } finally {
+    //   if (mounted) setState(() => isSubmitting = false);
+    // }
     try {
-      final res = await http.post(
-        Uri.parse(
-          "https://survey-backend.shwapno.app/survey/api/survey/submit-response/",
-        ),
-        headers: {
-          "Authorization": "Bearer ${Get.find<AuthService>().getToken()}",
-          "Content-Type": "application/json",
-        },
-        body: body,
+      final uri = Uri.parse(
+        "https://survey-backend.shwapno.app/survey/api/survey/submit-response/",
       );
 
+      // add a per-call timeout
+      http.Response res;
+      try {
+        res = await http
+            .post(
+          uri,
+          headers: {
+            "Authorization": "Bearer ${Get.find<AuthService>().getToken()}",
+            "Content-Type": "application/json",
+          },
+          body: body,
+        )
+            .timeout(const Duration(seconds: 30));
+      } on Exception {
+        // brief retry once on timeout/socket hiccup
+        res = await http
+            .post(
+          uri,
+          headers: {
+            "Authorization": "Bearer ${Get.find<AuthService>().getToken()}",
+            "Content-Type": "application/json",
+          },
+          body: body,
+        )
+            .timeout(const Duration(seconds: 30));
+      }
+
       if (res.statusCode == 200 || res.statusCode == 201) {
-        // ✅ clear state so returning shows a fresh form
         controller.resetAll();
 
         final responseJson = jsonDecode(res.body);
         final responseId = responseJson['response_id'];
 
-        // Condition Check
-        // ✅ Persist both code & name against this response so Result uses the exact outlet you submitted
+        final box = GetStorage();
+        final selectedSiteCode =
+            GetStorage().read('selected_site_code') ??
+                (widget.surveyData['site_code'] ?? '');
+        final selectedSiteName =
+            box.read('selected_site_name') ??
+                widget.surveyData['site_name'] ??
+                widget.surveyData['siteName'];
+
         if (selectedSiteCode is String && selectedSiteCode.trim().isNotEmpty) {
           box.write('response_site_code_$responseId', selectedSiteCode.trim());
         }
         if (selectedSiteName is String &&
             selectedSiteName.toString().trim().isNotEmpty) {
-          box.write(
-            'response_site_name_$responseId',
-            selectedSiteName.toString().trim(),
-          );
+          box.write('response_site_name_$responseId',
+              selectedSiteName.toString().trim());
         }
 
-        // (Optional helper for later reads; doesn’t affect UI/UX)
-        GetStorage().write('response_site_code_$responseId', selectedSiteCode);
-
         Get.to(() => ResultScreen(responseId: responseId));
+      } else if (res.statusCode == 401) {
+        Get.snackbar("Session expired", "Please login again.");
       } else {
         Get.snackbar("Error", "Error submitting survey: ${res.statusCode}");
       }
@@ -454,6 +523,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
     } finally {
       if (mounted) setState(() => isSubmitting = false);
     }
+
   }
 
   Future<String> _encodeImageToBase64(String imagePath) async {

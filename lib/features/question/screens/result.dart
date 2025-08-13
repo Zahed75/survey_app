@@ -38,18 +38,19 @@ class _ResultScreenState extends State<ResultScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // <- make sure the first build doesn't show the error state
+      // Ensure the first build shows the spinner, not the error state
       controller.isLoading.value = true;
 
-      // 1) show cached (if any)
+      // 1) Try cache for this response id
       await controller.loadCachedResult(widget.responseId);
 
-      // 2) then refresh from API
+      // 2) Then refresh from backend
       await controller.loadResult(widget.responseId);
 
       GetStorage().write('last_response_id', widget.responseId);
     });
   }
+
 
 
   @override
@@ -85,10 +86,31 @@ class _ResultScreenState extends State<ResultScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          // final data = controller.result.value;
+          // if (data == null) {
+          //   return const Center(child: Text("Failed to load survey result"));
+          // }
+
           final data = controller.result.value;
           if (data == null) {
-            return const Center(child: Text("Failed to load survey result"));
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Refresh again !'),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () async {
+                      controller.isLoading.value = true;
+                      await controller.loadResult(widget.responseId);
+                    },
+                    child: const Text('Refresh'),
+                  ),
+                ],
+              ),
+            );
           }
+
 
           final totalScore = data.overall.obtainedMarks;
           final maxScore = data.overall.totalMarks;

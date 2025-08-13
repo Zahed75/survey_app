@@ -6,6 +6,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:survey_app/data/models/survey_result_model.dart';
 import 'package:survey_app/data/repository/survey_result_repository.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../../common/widgets/alerts/u_alert.dart';
 import '../../../data/services/site-service.dart';
 
 class SurveyResultController extends GetxController {
@@ -109,16 +110,107 @@ class SurveyResultController extends GetxController {
 
 
   // ---- Helpers for per-id cache ----
+//   String _cacheKeyFor(int id) => 'result_$id';
+//
+// // Read a per-id cached result if present.
+// // Does NOT toggle isLoading (so the spinner is controlled by the caller).
+//   Future<bool> loadCachedResult(int responseId) async {
+//     try {
+//       final cached = _storage.read(_cacheKeyFor(responseId));
+//       if (cached != null && cached is String && cached.isNotEmpty) {
+//         final map = jsonDecode(cached) as Map<String, dynamic>;
+//         result.value = SurveyResult.fromJson(map);
+//         return true;
+//       }
+//     } catch (_) {}
+//     return false;
+//   }
+//
+//   Future<void> loadResult(int responseId, {bool updateCache = true}) async {
+//     const String lastCacheKey = 'last_survey_result';
+//     final String responseSiteKey = 'response_site_code_$responseId';
+//     final String responseSiteNameKey = 'response_site_name_$responseId';
+//
+//     try {
+//       isLoading.value = true;
+//
+//       // 1) Fetch result from API
+//       final data = await _repo.fetchResultByCategory(responseId);
+//
+//       // 2) Rename "Uncategorized" -> "General"
+//       final updatedCategories = data.categories.map((c) {
+//         if (c.name == "Uncategorized") {
+//           return CategoryResult(
+//             name: "General",
+//             obtainedMarks: c.obtainedMarks,
+//             totalMarks: c.totalMarks,
+//             percentage: c.percentage,
+//             questions: c.questions,
+//           );
+//         }
+//         return c;
+//       }).toList();
+//
+//       // 3) Prefer submitted site code/name captured at submit time
+//       final savedSiteCode = _storage.read(responseSiteKey);
+//       final savedSiteName = _storage.read(responseSiteNameKey);
+//
+//       final String? effectiveSiteCode =
+//       (savedSiteCode is String && savedSiteCode.trim().isNotEmpty)
+//           ? savedSiteCode.trim()
+//           : data.siteCode;
+//
+//       final String? effectiveSiteName =
+//       (savedSiteName is String && savedSiteName.trim().isNotEmpty)
+//           ? savedSiteName.trim()
+//           : data.siteName;
+//
+//       // 4) Build final model
+//       final patched = SurveyResult(
+//         responseId: data.responseId,
+//         surveyTitle: data.surveyTitle,
+//         submittedByUserId: data.submittedByUserId,
+//         submittedAt: data.submittedAt,
+//         overall: data.overall,
+//         categories: updatedCategories,
+//         siteCode: effectiveSiteCode,
+//         siteName: effectiveSiteName,
+//         timestamp: data.timestamp,
+//       );
+//
+//       // 5) Update UI
+//       result.value = patched;
+//
+//       // 6) Cache consistently
+//       if (updateCache) {
+//         // per-id cache (used by loadCachedResult)
+//         _storage.write(_cacheKeyFor(responseId), jsonEncode(patched.toJson()));
+//
+//         // optional: keep your legacy "last" cache too (harmless)
+//         _storage.write(
+//           lastCacheKey,
+//           jsonEncode({"responseId": responseId, "data": patched.toJson()}),
+//         );
+//       }
+//     } catch (e) {
+//       // Only show error if we truly have nothing to display
+//       if (result.value == null) {
+//         Get.snackbar("Error", "Failed to load result");
+//       }
+//     } finally {
+//       isLoading.value = false;
+//     }
+//   }
+
+
+
   String _cacheKeyFor(int id) => 'result_$id';
 
-// Read a per-id cached result if present.
-// Does NOT toggle isLoading (so the spinner is controlled by the caller).
   Future<bool> loadCachedResult(int responseId) async {
     try {
       final cached = _storage.read(_cacheKeyFor(responseId));
-      if (cached != null && cached is String && cached.isNotEmpty) {
-        final map = jsonDecode(cached) as Map<String, dynamic>;
-        result.value = SurveyResult.fromJson(map);
+      if (cached is String && cached.isNotEmpty) {
+        result.value = SurveyResult.fromJson(jsonDecode(cached));
         return true;
       }
     } catch (_) {}
@@ -133,10 +225,8 @@ class SurveyResultController extends GetxController {
     try {
       isLoading.value = true;
 
-      // 1) Fetch result from API
       final data = await _repo.fetchResultByCategory(responseId);
 
-      // 2) Rename "Uncategorized" -> "General"
       final updatedCategories = data.categories.map((c) {
         if (c.name == "Uncategorized") {
           return CategoryResult(
@@ -150,7 +240,6 @@ class SurveyResultController extends GetxController {
         return c;
       }).toList();
 
-      // 3) Prefer submitted site code/name captured at submit time
       final savedSiteCode = _storage.read(responseSiteKey);
       final savedSiteName = _storage.read(responseSiteNameKey);
 
@@ -164,7 +253,6 @@ class SurveyResultController extends GetxController {
           ? savedSiteName.trim()
           : data.siteName;
 
-      // 4) Build final model
       final patched = SurveyResult(
         responseId: data.responseId,
         surveyTitle: data.surveyTitle,
@@ -177,29 +265,28 @@ class SurveyResultController extends GetxController {
         timestamp: data.timestamp,
       );
 
-      // 5) Update UI
       result.value = patched;
 
-      // 6) Cache consistently
       if (updateCache) {
-        // per-id cache (used by loadCachedResult)
+        // Per‑id cache (what loadCachedResult reads)
         _storage.write(_cacheKeyFor(responseId), jsonEncode(patched.toJson()));
-
-        // optional: keep your legacy "last" cache too (harmless)
+        // Legacy “last” cache (optional)
         _storage.write(
           lastCacheKey,
           jsonEncode({"responseId": responseId, "data": patched.toJson()}),
         );
       }
     } catch (e) {
-      // Only show error if we truly have nothing to display
+      // Only show error if we truly have nothing on screen
       if (result.value == null) {
-        Get.snackbar("Error", "Failed to load result");
+        // Get.snackbar("Error", "Failed to load result");
+        UAlert.show(title: 'Network Issues', message: 'Try Again');
       }
     } finally {
       isLoading.value = false;
     }
   }
+
 
 
 
