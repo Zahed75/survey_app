@@ -138,7 +138,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
                         }),
                         style: FilledButton.styleFrom(
                           backgroundColor:
-                          controller.answers[id] == choice['id']
+                              controller.answers[id] == choice['id']
                               ? Colors.green
                               : null,
                         ),
@@ -245,13 +245,14 @@ class _QuestionScreenState extends State<QuestionScreen> {
               Slider(
                 min: (question['min_value'] ?? 0).toDouble(),
                 max: (question['max_value'] ?? 20).toDouble(),
-                divisions: ((question['max_value'] ?? 20) -
-                    (question['min_value'] ?? 0))
-                    .toInt(),
+                divisions:
+                    ((question['max_value'] ?? 20) -
+                            (question['min_value'] ?? 0))
+                        .toInt(),
                 value: (controller.answers[id] ?? (question['min_value'] ?? 0))
                     .toDouble(),
                 label:
-                "${controller.answers[id] ?? question['min_value'] ?? 0}",
+                    "${controller.answers[id] ?? question['min_value'] ?? 0}",
                 onChanged: (val) => setState(() {
                   controller.updateAnswer(id, val.round());
                 }),
@@ -328,98 +329,6 @@ class _QuestionScreenState extends State<QuestionScreen> {
     return true;
   }
 
-  // Future<void> submitSurvey() async {
-  //   if (isSubmitting) return;
-  //
-  //   final questions = widget.surveyData['questions'] as List;
-  //
-  //   // ✅ required validation
-  //   if (!_validateRequired(questions)) return;
-  //
-  //   setState(() => isSubmitting = true);
-  //
-  //   final questionResponses = <Map<String, dynamic>>[];
-  //
-  //   for (int i = 0; i < questions.length; i++) {
-  //     final q = questions[i];
-  //     final id = q['id'];
-  //     final type = q['type'];
-  //
-  //     final entry = {"question": id};
-  //
-  //     // ✅ yes/no: send only the selected choice id
-  //     if (type == 'yesno' && controller.answers.containsKey(id)) {
-  //       entry["selected_choice"] = {
-  //         "id": controller.answers[id],
-  //       };
-  //     }
-  //     // ✅ choice (MCQ): send only id
-  //     else if (type == 'choice' && controller.answers.containsKey(id)) {
-  //       entry["selected_choice"] = {
-  //         "id": controller.answers[id],
-  //       };
-  //     }
-  //     // ✅ multiple_scoring: send only id
-  //     else if (type == 'multiple_scoring' &&
-  //         controller.answers.containsKey(id)) {
-  //       entry["selected_choice"] = {
-  //         "id": controller.answers[id],
-  //       };
-  //     } else if (type == 'image' && controller.uploadedImages[id] != null) {
-  //       entry["image"] = await _encodeImageToBase64(
-  //         controller.uploadedImages[id]!,
-  //       );
-  //     } else if (type == 'location' &&
-  //         controller.detectedLocations[id] != null) {
-  //       entry["location"] = {
-  //         "lat": controller.detectedLocations[id]!["latitude"],
-  //         "lon": controller.detectedLocations[id]!["longitude"],
-  //       };
-  //     } else if ((type == 'text' || type == 'remarks') &&
-  //         controller.answers[id]?.isNotEmpty == true) {
-  //       entry["answer_text"] = controller.answers[id];
-  //     } else if (type == 'linear' && controller.answers[id] != null) {
-  //       entry["linear_value"] = controller.answers[id];
-  //     }
-  //
-  //     questionResponses.add(entry);
-  //   }
-  //
-  //   final body = jsonEncode({
-  //     "survey": widget.surveyData['id'],
-  //     "location_lat": controller.latitude.value.toString(),
-  //     "location_lon": controller.longitude.value.toString(),
-  //     "question_responses": questionResponses,
-  //   });
-  //
-  //   try {
-  //     final res = await http.post(
-  //       Uri.parse(
-  //         "https://survey-backend.shwapno.app/survey/api/survey/submit-response/",
-  //       ),
-  //       headers: {
-  //         "Authorization": "Bearer ${Get.find<AuthService>().getToken()}",
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: body,
-  //     );
-  //
-  //     if (res.statusCode == 200 || res.statusCode == 201) {
-  //       // ✅ clear state so returning shows a fresh form
-  //       controller.resetAll();
-  //
-  //       final responseJson = jsonDecode(res.body);
-  //       final responseId = responseJson['response_id'];
-  //       Get.to(() => ResultScreen(responseId: responseId));
-  //     } else {
-  //       Get.snackbar("Error", "Error submitting survey: ${res.statusCode}");
-  //     }
-  //   } catch (e) {
-  //     Get.snackbar("Error", "Error submitting survey: $e");
-  //   } finally {
-  //     if (mounted) setState(() => isSubmitting = false);
-  //   }
-  // }
 
   Future<void> submitSurvey() async {
     if (isSubmitting) return;
@@ -442,21 +351,16 @@ class _QuestionScreenState extends State<QuestionScreen> {
 
       // ✅ yes/no: send only the selected choice id
       if (type == 'yesno' && controller.answers.containsKey(id)) {
-        entry["selected_choice"] = {
-          "id": controller.answers[id],
-        };
+        entry["selected_choice"] = {"id": controller.answers[id]};
       }
       // ✅ choice (MCQ): send only id
       else if (type == 'choice' && controller.answers.containsKey(id)) {
-        entry["selected_choice"] = {
-          "id": controller.answers[id],
-        };
+        entry["selected_choice"] = {"id": controller.answers[id]};
       }
       // ✅ multiple_scoring: send only id
-      else if (type == 'multiple_scoring' && controller.answers.containsKey(id)) {
-        entry["selected_choice"] = {
-          "id": controller.answers[id],
-        };
+      else if (type == 'multiple_scoring' &&
+          controller.answers.containsKey(id)) {
+        entry["selected_choice"] = {"id": controller.answers[id]};
       }
       // ✅ image as base64
       else if (type == 'image' && controller.uploadedImages[id] != null) {
@@ -487,15 +391,15 @@ class _QuestionScreenState extends State<QuestionScreen> {
     // ✅ Include the selected site_code (fixes wrong site in result)
     final selectedSiteCode =
         GetStorage().read('selected_site_code') ??
-            (widget.surveyData['site_code'] ?? '');
-
+        (widget.surveyData['site_code'] ?? '');
 
     // Try to get name from storage/survey
     String? selectedSiteName =
         box.read('selected_site_name') ??
-            widget.surveyData['site_name'] ??
-            widget.surveyData['siteName'];
+        widget.surveyData['site_name'] ??
+        widget.surveyData['siteName'];
 
+    print(selectedSiteName);
 
     final body = jsonEncode({
       "survey": widget.surveyData['id'],
@@ -525,14 +429,17 @@ class _QuestionScreenState extends State<QuestionScreen> {
         final responseJson = jsonDecode(res.body);
         final responseId = responseJson['response_id'];
 
-
         // Condition Check
         // ✅ Persist both code & name against this response so Result uses the exact outlet you submitted
         if (selectedSiteCode is String && selectedSiteCode.trim().isNotEmpty) {
           box.write('response_site_code_$responseId', selectedSiteCode.trim());
         }
-        if (selectedSiteName is String && selectedSiteName.toString().trim().isNotEmpty) {
-          box.write('response_site_name_$responseId', selectedSiteName.toString().trim());
+        if (selectedSiteName is String &&
+            selectedSiteName.toString().trim().isNotEmpty) {
+          box.write(
+            'response_site_name_$responseId',
+            selectedSiteName.toString().trim(),
+          );
         }
 
         // (Optional helper for later reads; doesn’t affect UI/UX)

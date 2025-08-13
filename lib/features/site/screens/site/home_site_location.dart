@@ -90,9 +90,13 @@ class HomeSiteLocation extends StatelessWidget {
                       final siteCode = site['site_code'];
                       final siteName = site['name'] ?? '';
 
+
+
+
                       return GestureDetector(
                         onTap: () {
                           controller.setSelectedSite(siteCode);
+                          controller.storage.write('selected_site_name', siteName);
                           NavigationController.instance.resetToHome();
                           Get.offAll(() => const NavigationMenu());
                         },
