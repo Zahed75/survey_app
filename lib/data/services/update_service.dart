@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_installer/flutter_app_installer.dart';
+import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -114,25 +116,26 @@ class UpdateService {
   /// ---- Internals shared by all flows --------------------------------------
 
   static Future<_DownloadApiData?> _fetchRemote() async {
-    final dio = Dio();
-    // Try download endpoint first
-    final resp = await dio.get(
-      _downloadEndpoint,
-      options: Options(followRedirects: true, validateStatus: (s) => s != null && s < 500),
-    );
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
+      sendTimeout: const Duration(seconds: 20),
+      followRedirects: true,
+      validateStatus: (s) => s != null && s < 500,
+    ));
+
+    final resp = await dio.get(_downloadEndpoint);
     if (resp.statusCode == 200 && resp.data != null) {
       return _DownloadApiData.fromJson(resp.data);
     }
-    // Fallback to update endpoint
-    final resp2 = await dio.get(
-      _updateEndpoint,
-      options: Options(followRedirects: true, validateStatus: (s) => s != null && s < 500),
-    );
+
+    final resp2 = await dio.get(_updateEndpoint);
     if (resp2.statusCode == 200 && resp2.data != null) {
       return _DownloadApiData.fromJson(resp2.data);
     }
     return null;
   }
+
 
   static Future<int> _localVersionCode() async {
     final info = await PackageInfo.fromPlatform();
@@ -186,20 +189,24 @@ class UpdateService {
 
   /// UI dialog flow used across screens
   static Future<void> _promptIfUpdateAvailable(BuildContext context) async {
+    // Prefer a stable, top-level context
+    final dlgContext = Get.overlayContext ?? context;
+
     final info = await _fetchRemote();
     if (info == null) return;
 
     final local = await _localVersionCode();
     final should = info.versionCode > local;
-    if (!should || !context.mounted) return;
+    if (!should || !(dlgContext.mounted)) return;
 
     bool downloading = false;
     double progress = 0.0;
     String? error;
 
     await showDialog(
-      context: context,
+      context: dlgContext,
       barrierDismissible: !info.isMandatory,
+      useRootNavigator: true, // ✅ important
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
           title: Text(info.isMandatory ? 'Update required' : 'Update available'),
@@ -231,7 +238,7 @@ class UpdateService {
           actions: [
             if (!info.isMandatory)
               TextButton(
-                onPressed: downloading ? null : () => Navigator.of(ctx).pop(),
+                onPressed: downloading ? null : () => Navigator.of(ctx, rootNavigator: true).pop(),
                 child: const Text('Later'),
               ),
             FilledButton(
@@ -251,7 +258,7 @@ class UpdateService {
                       if (t > 0) setState(() => progress = r / t);
                     },
                   );
-                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (ctx.mounted) Navigator.of(ctx, rootNavigator: true).pop();
                   await _install(apk);
                 } catch (e) {
                   setState(() {
@@ -267,4 +274,5 @@ class UpdateService {
       ),
     );
   }
+
 }

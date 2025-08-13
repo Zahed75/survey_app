@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -75,14 +76,17 @@ class _AppRootState extends State<_AppRoot> {
 
     // Run post-frame so dialogs show over a live widget tree
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        await _requestStartupPermissions();                  // 1) initial-stage permissions
-        await UpdateService.forceUpdateIfAvailable(context); // 2) update dialog if any
-      } finally {
-        FlutterNativeSplash.remove();                        // 3) hide splash when done
-      }
+      // ✅ Show the first frame immediately
+      FlutterNativeSplash.remove();
+
+      // ✅ Fire-and-forget; don't block the UI thread waiting for update check
+      unawaited(_requestStartupPermissions());
+
+      // ✅ Fire-and-forget update prompt. Using root navigator keeps it stable
+      unawaited(UpdateService.forceUpdateIfAvailable(Get.overlayContext ?? context));
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
