@@ -75,23 +75,20 @@
 //
 // }
 
-
-
-
-
 // survey_repository.dart
 
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get_storage/get_storage.dart';
 import '../services/auth_service.dart';
-import 'dart:convert';
 
 class SurveyRepository {
-  final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 30),
-  ));
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 30),
+    ),
+  );
 
   static const String _base = 'https://survey-backend.shwapno.app';
   final _box = GetStorage();
@@ -103,8 +100,10 @@ class SurveyRepository {
     final siteCode = rawSite.trim(); // don’t alter case here; just trim
     final token = _token;
 
-    debugPrint('[SurveyRepository] fetchUserSurveys site_code="$siteCode" '
-        'tokenPresent=${token != null && token.isNotEmpty}');
+    debugPrint(
+      '[SurveyRepository] fetchUserSurveys site_code="$siteCode" '
+      'tokenPresent=${token != null && token.isNotEmpty}',
+    );
 
     Map<String, dynamic>? firstJson;
 
@@ -113,13 +112,17 @@ class SurveyRepository {
       final resp = await _dio.get(
         '$_base/survey/api/survey_by_user/',
         queryParameters: siteCode.isNotEmpty ? {'site_code': siteCode} : null,
-        options: Options(headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        }),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
       );
 
-      debugPrint('[SurveyRepository] status=${resp.statusCode} (with site_code)');
+      debugPrint(
+        '[SurveyRepository] status=${resp.statusCode} (with site_code)',
+      );
 
       if (resp.statusCode == 200 && resp.data is Map<String, dynamic>) {
         firstJson = resp.data as Map<String, dynamic>;
@@ -127,15 +130,19 @@ class SurveyRepository {
         final filtered = firstJson['filtered_by_site_code'];
         final data = firstJson['data'];
 
-        debugPrint('[SurveyRepository] server says survey_count=$count '
-            'filtered_by="$filtered" type=${data.runtimeType}');
+        debugPrint(
+          '[SurveyRepository] server says survey_count=$count '
+          'filtered_by="$filtered" type=${data.runtimeType}',
+        );
 
         // If server already returned items, use them.
         if (data is List && data.isNotEmpty) {
           return List<dynamic>.from(data);
         }
       } else {
-        debugPrint('[SurveyRepository] non-200 on first call -> ${resp.statusCode}');
+        debugPrint(
+          '[SurveyRepository] non-200 on first call -> ${resp.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('[SurveyRepository] first call error: $e');
@@ -145,14 +152,18 @@ class SurveyRepository {
     // 2) Fallback: fetch ALL surveys then filter locally by site_code
     //    (workaround for backend filter returning 0 unexpectedly)
     try {
-      debugPrint('[SurveyRepository] fallback -> fetching unfiltered then local-filter…');
+      debugPrint(
+        '[SurveyRepository] fallback -> fetching unfiltered then local-filter…',
+      );
 
       final resp2 = await _dio.get(
         '$_base/survey/api/survey_by_user/',
-        options: Options(headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        }),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
       );
 
       debugPrint('[SurveyRepository] fallback status=${resp2.statusCode}');
@@ -167,15 +178,20 @@ class SurveyRepository {
           final filteredList = data2.where((item) {
             try {
               final it = (item as Map<String, dynamic>);
-              final sc = (it['site_code'] ?? '').toString().trim().toLowerCase();
+              final sc = (it['site_code'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
               return want.isEmpty ? true : sc == want;
             } catch (_) {
               return false;
             }
           }).toList();
 
-          debugPrint('[SurveyRepository] fallback filtered '
-              '${filteredList.length} / ${data2.length} for "$siteCode"');
+          debugPrint(
+            '[SurveyRepository] fallback filtered '
+            '${filteredList.length} / ${data2.length} for "$siteCode"',
+          );
 
           return filteredList;
         }

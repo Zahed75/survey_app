@@ -165,7 +165,7 @@ class NavigationController extends GetxController {
 /// - Otherwise, show the placeholder screen.
 /// This wrapper avoids rebuilding the whole NavigationMenu when GetStorage changes.
 class _ResultTabEntryPoint extends StatelessWidget {
-  const _ResultTabEntryPoint({super.key});
+  const _ResultTabEntryPoint();
 
   @override
   Widget build(BuildContext context) {

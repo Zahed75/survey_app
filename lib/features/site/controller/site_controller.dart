@@ -22,8 +22,8 @@ class SiteController extends GetxController {
   /// Search state
   var searchQuery = ''.obs;
 
-  /// Pagination (IMPORTANT: keep page size CONSTANT to avoid missing ranges)
-  static const int _kPageSize = 21; // choose 21 to preserve your first-page UX
+  /// Pagination (keep your UX constants)
+  static const int _kPageSize = 21;
   int _page = 1;
   int _numPages = 1;
   bool _hasMore = true;
@@ -31,8 +31,15 @@ class SiteController extends GetxController {
   /// ScrollController to detect bottom
   final ScrollController scrollController = ScrollController();
 
-  /// Debounce for search-driven fetch-ahead (so we don't spam API while typing)
+  /// Debounce for search-driven fetch-ahead (kept, but won’t be needed as much after full prefetch)
   Timer? _searchDebounce;
+
+  /// Prevent overlapping paging from any source
+  bool _isPaging = false;
+
+  /// Tickets to cancel stale loops
+  int _searchTicket = 0;
+  int _prefetchTicket = 0;
 
   @override
   void onInit() {
@@ -41,13 +48,13 @@ class SiteController extends GetxController {
     // restore selected site (if any)
     selectedSiteCode.value = storage.read('selected_site_code') ?? '';
 
-    // Attach listener for infinite scroll
+    // Attach listener for infinite scroll (kept, harmless after full prefetch)
     scrollController.addListener(_onScroll);
 
-    // Initial load
-    loadFirstPage();
+    // Initial load => fast page 1 for UX, then deterministically fetch the rest
+    _loadAllPagesDeterministically();
 
-    // React to search input: if not found yet and has more pages, fetch ahead
+    // React to search input
     ever<String>(searchQuery, (q) {
       _searchDebounce?.cancel();
       _searchDebounce = Timer(const Duration(milliseconds: 250), () {
@@ -68,7 +75,10 @@ class SiteController extends GetxController {
   void setSearchQuery(String q) => searchQuery.value = q;
 
   /// Filtered view (code OR name matches)
+  /// IMPORTANT: reference assignedSites.length to make Obx rebuild on changes.
   List<Map<String, dynamic>> get sites {
+    // touch the Rx to register dependency for Obx
+    final _touch = assignedSites.length;
     final q = searchQuery.value.trim().toLowerCase();
     if (q.isEmpty) return List<Map<String, dynamic>>.from(assignedSites);
     return assignedSites.where((s) {
@@ -78,7 +88,7 @@ class SiteController extends GetxController {
     }).toList();
   }
 
-  /// Public: called after login & on init
+  /// PUBLIC API kept for back-compat (not used by screen directly)
   Future<void> loadFirstPage() async {
     _page = 1;
     _hasMore = true;
@@ -86,85 +96,26 @@ class SiteController extends GetxController {
     await _fetchPage();
   }
 
-  /// Load next page — keeps the SAME page size for all pages
+  /// PUBLIC API kept for back-compat (scroll)
   Future<void> loadNextPage() async {
-    if (!_hasMore || isLoadingMore.value || isLoading.value) return;
-
+    if (_isPaging || !_hasMore || isLoadingMore.value || isLoading.value)
+      return;
+    _isPaging = true;
     isLoadingMore.value = true;
     _page += 1;
     try {
       await _fetchPage();
     } finally {
       isLoadingMore.value = false;
+      _isPaging = false;
     }
   }
-
-  // Future<void> _fetchPage() async {
-  //   try {
-  //     if (_page == 1) isLoading.value = true;
-  //
-  //     final token = storage.read('access_token');
-  //     if (token == null || token.toString().isEmpty) {
-  //       assignedSites.clear();
-  //       _hasMore = false;
-  //       return;
-  //     }
-  //
-  //     final resp = await _dio.get(
-  //       '/api/user/get_site_access_by_user',
-  //       queryParameters: {
-  //         'page': _page,
-  //         'page_size': _kPageSize, // <-- CONSTANT page size (no skipping)
-  //       },
-  //       options: Options(
-  //         headers: {
-  //           'Authorization': 'Bearer $token',
-  //           'Accept': 'application/json',
-  //         },
-  //       ),
-  //     );
-  //
-  //     if (resp.statusCode == 200 && resp.data is Map) {
-  //       final map = resp.data as Map;
-  //       final List sites = (map['sites'] ?? []) as List;
-  //       _numPages = (map['num_pages'] ?? 1) as int;
-  //
-  //       // De-dup by site_code (handles back/forward navigation)
-  //       final existing = {
-  //         for (var s in assignedSites) (s['site_code']?.toString() ?? ''): s,
-  //       };
-  //
-  //       for (final raw in sites) {
-  //         if (raw is Map && raw['site_code'] != null) {
-  //           final code = raw['site_code'].toString();
-  //           existing[code] = Map<String, dynamic>.from(raw);
-  //         }
-  //       }
-  //
-  //       assignedSites.value = existing.values.toList();
-  //       _hasMore = _page < _numPages;
-  //     } else {
-  //       _hasMore = false; // stop trying on non-200
-  //     }
-  //   } catch (_) {
-  //     _hasMore = false; // fail safe
-  //   } finally {
-  //     if (_page == 1) isLoading.value = false;
-  //   }
-  // }
-
-
-
-  // site_controller.dart
 
   Future<void> _fetchPage() async {
     try {
       if (_page == 1) isLoading.value = true;
 
       final token = storage.read('access_token');
-      debugPrint('[SiteController] _fetchPage page=$_page size=$_kPageSize '
-          'tokenPresent=${token != null && token.toString().isNotEmpty}');
-
       if (token == null || token.toString().isEmpty) {
         assignedSites.clear();
         _hasMore = false;
@@ -175,21 +126,22 @@ class SiteController extends GetxController {
       final resp = await _dio.get(
         '/api/user/get_site_access_by_user',
         queryParameters: {'page': _page, 'page_size': _kPageSize},
-        options: Options(headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        }),
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ),
       );
 
-      debugPrint('[SiteController] response status=${resp.statusCode}');
+      debugPrint(
+        '[SiteController] _fetchPage status=${resp.statusCode} page=$_page',
+      );
 
       if (resp.statusCode == 200 && resp.data is Map) {
         final map = resp.data as Map;
         final List sites = (map['sites'] ?? []) as List;
         _numPages = (map['num_pages'] ?? 1) as int;
-
-        debugPrint('[SiteController] got ${sites.length} sites '
-            '(now have=${assignedSites.length}) num_pages=$_numPages');
 
         final existing = {
           for (var s in assignedSites) (s['site_code']?.toString() ?? ''): s,
@@ -201,9 +153,8 @@ class SiteController extends GetxController {
           }
         }
         assignedSites.value = existing.values.toList();
+
         _hasMore = _page < _numPages;
-        debugPrint('[SiteController] merged -> total=${assignedSites.length} '
-            'hasMore=$_hasMore');
       } else {
         _hasMore = false;
         debugPrint('[SiteController] non-200 -> stop paging');
@@ -216,29 +167,24 @@ class SiteController extends GetxController {
     }
   }
 
-// selection write with logging
+  /// selection write with logging
   Future<void> setSelectedSite(String code) async {
     final normalized = (code).toString().trim().toUpperCase();
-    debugPrint('[SiteController] setSelectedSite request="$code" -> "$normalized"');
     selectedSiteCode.value = normalized;
     await storage.write('selected_site_code', normalized);
-    final rb = storage.read('selected_site_code');
-    debugPrint('[SiteController] setSelectedSite wrote="$rb"');
+    debugPrint('[SiteController] setSelectedSite="$normalized" persisted');
   }
 
-
-
-  /// When user searches e.g. "D016" and it's not in the loaded pages yet,
-  /// progressively load more pages (with same page size) until:x
-  ///  - we find at least one match, or
-  ///  - we run out of pages.
+  /// Search-ahead (still here but won’t be needed once full list cached)
   Future<void> _fetchAheadUntilMatchedOrExhausted(String q) async {
-    if (q.isEmpty) return;
-    if (sites.isNotEmpty) return; // already matched in current data
+    final query = q.trim();
+    if (query.isEmpty) return;
 
-    // Do a quick probe against currently loaded (unfiltered) list;
-    // if it's there but filtered list is empty, we’re done.
-    final lower = q.toLowerCase();
+    // If filtered view already matches, skip
+    if (sites.isNotEmpty) return;
+
+    // If loaded list already contains it, skip
+    final lower = query.toLowerCase();
     final existsInLoaded = assignedSites.any((s) {
       final code = (s['site_code'] ?? '').toString().toLowerCase();
       final name = (s['name'] ?? '').toString().toLowerCase();
@@ -246,9 +192,14 @@ class SiteController extends GetxController {
     });
     if (existsInLoaded) return;
 
-    // Otherwise fetch forward while there are more pages and still no match.
+    final myTicket = ++_searchTicket;
+    int safety = 0;
+    const int kMaxExtraPages = 200;
+
     while (_hasMore) {
+      if (myTicket != _searchTicket) return;
       await loadNextPage();
+      if (myTicket != _searchTicket) return;
 
       final foundNow = assignedSites.any((s) {
         final code = (s['site_code'] ?? '').toString().toLowerCase();
@@ -256,6 +207,12 @@ class SiteController extends GetxController {
         return code.contains(lower) || name.contains(lower);
       });
       if (foundNow) break;
+
+      safety += 1;
+      if (safety >= kMaxExtraPages) {
+        debugPrint('[SiteController] fetchAhead safety break for "$query"');
+        break;
+      }
     }
   }
 
@@ -263,30 +220,56 @@ class SiteController extends GetxController {
     if (!scrollController.hasClients) return;
     final max = scrollController.position.maxScrollExtent;
     final current = scrollController.position.pixels;
-
-    // When user reaches near the bottom, load more
     if (current >= max - 200) {
       loadNextPage();
     }
   }
 
-  // Future<void> setSelectedSite(String code) async {
-  //   selectedSiteCode.value = code;
-  //   await storage.write('selected_site_code', code);
-  // }
-
-
-  // site_controller.dart
-  // Future<void> setSelectedSite(String code) async {
-  //   final normalized = (code).toString().trim().toUpperCase();
-  //   selectedSiteCode.value = normalized;
-  //   await storage.write('selected_site_code', normalized);
-  // }
-
-
-
-  /// Back-compat for old calls (no-op now)
+  /// Back-compat for old calls
   Future<void> fetchAssignedSitesFromToken() async {
     await loadFirstPage();
+  }
+
+  /// === KEY FIX: Deterministic full prefetch (no overlaps) ===
+  /// 1) Load page 1 quickly to render UI
+  /// 2) Then sequentially load pages 2..N (serialized)
+  Future<void> _loadAllPagesDeterministically() async {
+    // Step 1: fast page 1
+    _page = 1;
+    _hasMore = true;
+    assignedSites.clear();
+    await _fetchPage();
+
+    if (!_hasMore) {
+      debugPrint('[SiteController] only one page; done');
+      return;
+    }
+
+    // Step 2: fetch remaining pages in order (no overlap)
+    final myTicket = ++_prefetchTicket;
+    for (int p = 2; p <= _numPages; p++) {
+      if (myTicket != _prefetchTicket) {
+        debugPrint('[SiteController] prefetch canceled (newer ticket)');
+        return;
+      }
+      // block overlaps with scroll/search: we drive paging deterministically here
+      if (_isPaging || isLoading.value || isLoadingMore.value) {
+        // small yield if something else is in-flight (shouldn’t happen often)
+        await Future.delayed(const Duration(milliseconds: 120));
+      }
+      _isPaging = true;
+      try {
+        _page = p;
+        await _fetchPage();
+      } finally {
+        _isPaging = false;
+      }
+      // tiny yield for UI/network niceness
+      await Future.delayed(const Duration(milliseconds: 40));
+    }
+
+    debugPrint(
+      '[SiteController] FULL prefetch complete: total=${assignedSites.length}, pages=$_numPages',
+    );
   }
 }

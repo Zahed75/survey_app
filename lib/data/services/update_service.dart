@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_installer/flutter_app_installer.dart';
 import 'package:get/get.dart';
-import 'package:get/get_core/src/get_main.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -11,7 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 class _DownloadApiData {
   final String versionName; // e.g. "1.0.0+58"
-  final int versionCode;    // e.g. 58
+  final int versionCode; // e.g. 58
   final String apkUrl;
   final bool isMandatory;
   final String changelog;
@@ -30,7 +29,10 @@ class _DownloadApiData {
       versionName: (d['versionName'] ?? d['version'] ?? '').toString(),
       versionCode: (d['versionCode'] ?? d['build_number'] ?? 0) is int
           ? d['versionCode'] ?? d['build_number']
-          : int.tryParse((d['versionCode'] ?? d['build_number'] ?? '0').toString()) ?? 0,
+          : int.tryParse(
+                  (d['versionCode'] ?? d['build_number'] ?? '0').toString(),
+                ) ??
+                0,
       apkUrl: (d['apkUrl'] ?? d['apk_url'] ?? '').toString(),
       isMandatory: (d['isMandatory'] ?? d['is_mandatory'] ?? false) == true,
       changelog: (d['changelog'] ?? '').toString(),
@@ -61,7 +63,10 @@ class UpdateService {
       // Prefer the download endpoint
       final resp = await dio.get(
         _downloadEndpoint,
-        options: Options(followRedirects: true, validateStatus: (s) => s != null && s < 500),
+        options: Options(
+          followRedirects: true,
+          validateStatus: (s) => s != null && s < 500,
+        ),
       );
       if (resp.statusCode == 200 && resp.data != null) {
         final d = _DownloadApiData.fromJson(resp.data);
@@ -77,7 +82,10 @@ class UpdateService {
       // Fallback to the update endpoint if needed
       final resp2 = await dio.get(
         _updateEndpoint,
-        options: Options(followRedirects: true, validateStatus: (s) => s != null && s < 500),
+        options: Options(
+          followRedirects: true,
+          validateStatus: (s) => s != null && s < 500,
+        ),
       );
       if (resp2.statusCode == 200 && resp2.data != null) {
         final d = _DownloadApiData.fromJson(resp2.data);
@@ -116,13 +124,15 @@ class UpdateService {
   /// ---- Internals shared by all flows --------------------------------------
 
   static Future<_DownloadApiData?> _fetchRemote() async {
-    final dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 20),
-      sendTimeout: const Duration(seconds: 20),
-      followRedirects: true,
-      validateStatus: (s) => s != null && s < 500,
-    ));
+    final dio = Dio(
+      BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 20),
+        sendTimeout: const Duration(seconds: 20),
+        followRedirects: true,
+        validateStatus: (s) => s != null && s < 500,
+      ),
+    );
 
     final resp = await dio.get(_downloadEndpoint);
     if (resp.statusCode == 200 && resp.data != null) {
@@ -136,17 +146,16 @@ class UpdateService {
     return null;
   }
 
-
   static Future<int> _localVersionCode() async {
     final info = await PackageInfo.fromPlatform();
     return int.tryParse(info.buildNumber) ?? 0;
   }
 
   static Future<File> _downloadApk(
-      String url,
-      String versionName, {
-        void Function(int received, int total)? onProgress,
-      }) async {
+    String url,
+    String versionName, {
+    void Function(int received, int total)? onProgress,
+  }) async {
     final dir = await getExternalStorageDirectory();
     if (dir == null) throw Exception('No external storage directory');
 
@@ -176,7 +185,9 @@ class UpdateService {
     // Guard against HTML/partial downloads → avoids “parsing package”
     final len = await file.length();
     if (len < 1 * 1024 * 1024) {
-      throw Exception('Downloaded file too small ($len bytes) – not a valid APK');
+      throw Exception(
+        'Downloaded file too small ($len bytes) – not a valid APK',
+      );
     }
 
     return file;
@@ -209,7 +220,9 @@ class UpdateService {
       useRootNavigator: true, // ✅ important
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: Text(info.isMandatory ? 'Update required' : 'Update available'),
+          title: Text(
+            info.isMandatory ? 'Update required' : 'Update available',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,7 +234,9 @@ class UpdateService {
               ],
               if (downloading) ...[
                 const SizedBox(height: 12),
-                LinearProgressIndicator(value: (progress > 0 && progress < 1) ? progress : null),
+                LinearProgressIndicator(
+                  value: (progress > 0 && progress < 1) ? progress : null,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   (progress > 0 && progress <= 1)
@@ -231,42 +246,48 @@ class UpdateService {
               ],
               if (error != null) ...[
                 const SizedBox(height: 8),
-                Text(error!, style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                Text(
+                  error!,
+                  style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+                ),
               ],
             ],
           ),
           actions: [
             if (!info.isMandatory)
               TextButton(
-                onPressed: downloading ? null : () => Navigator.of(ctx, rootNavigator: true).pop(),
+                onPressed: downloading
+                    ? null
+                    : () => Navigator.of(ctx, rootNavigator: true).pop(),
                 child: const Text('Later'),
               ),
             FilledButton(
               onPressed: downloading
                   ? null
                   : () async {
-                setState(() {
-                  downloading = true;
-                  progress = 0;
-                  error = null;
-                });
-                try {
-                  final apk = await _downloadApk(
-                    info.apkUrl,
-                    info.versionName,
-                    onProgress: (r, t) {
-                      if (t > 0) setState(() => progress = r / t);
+                      setState(() {
+                        downloading = true;
+                        progress = 0;
+                        error = null;
+                      });
+                      try {
+                        final apk = await _downloadApk(
+                          info.apkUrl,
+                          info.versionName,
+                          onProgress: (r, t) {
+                            if (t > 0) setState(() => progress = r / t);
+                          },
+                        );
+                        if (ctx.mounted)
+                          Navigator.of(ctx, rootNavigator: true).pop();
+                        await _install(apk);
+                      } catch (e) {
+                        setState(() {
+                          downloading = false;
+                          error = e.toString();
+                        });
+                      }
                     },
-                  );
-                  if (ctx.mounted) Navigator.of(ctx, rootNavigator: true).pop();
-                  await _install(apk);
-                } catch (e) {
-                  setState(() {
-                    downloading = false;
-                    error = e.toString();
-                  });
-                }
-              },
               child: const Text('Download & Install'),
             ),
           ],
@@ -274,5 +295,4 @@ class UpdateService {
       ),
     );
   }
-
 }
