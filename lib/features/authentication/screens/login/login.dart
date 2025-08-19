@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // 🔁 Run update check after the first frame renders
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      UpdateService.forceUpdateIfAvailable(context);
+      UpdateService.promptIfVersionMismatch(context);
 
       // ⬇️ Fetch version info and set state
       final result = await UpdateService.fetchAppVersion();

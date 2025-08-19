@@ -4,6 +4,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'package:survey_app/data/services/auth_service.dart';
+import 'package:survey_app/data/services/update_service.dart'; // ⬅ reset + future checks
 import 'package:survey_app/my_app.dart';
 import 'package:survey_app/utils/theme/theme_controller.dart';
 import 'package:survey_app/features/site/controller/site_controller.dart';
@@ -16,6 +17,13 @@ Future<void> main() async {
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   await GetStorage.init();
+  GetStorage().write('update_installed_once', false);
+
+  // ✅ Reset the “only-this-run” suppression flag on every cold start
+  try {
+    final box = GetStorage();
+    box.write('update_installed_once', false);
+  } catch (_) {}
 
   // ⛔ DO NOT request permissions or run blocking update here
 

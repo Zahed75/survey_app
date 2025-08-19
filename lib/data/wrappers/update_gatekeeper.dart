@@ -24,6 +24,14 @@ class _UpdateGatekeeperState extends State<UpdateGatekeeper> {
 
   Future<void> _checkIfBlocked() async {
     final box = GetStorage();
+
+    // 🔧 If we already started an install from this app, don’t block/prompt again
+    if (box.read('update_installed_once') == true) {
+      debugPrint('[UpdateGatekeeper] Skip block: update_installed_once=true');
+      setState(() => _shouldBlock = false);
+      return;
+    }
+
     final latestBuild = box.read('latest_build');
     final currentBuild =
         int.tryParse((await PackageInfo.fromPlatform()).buildNumber) ?? 0;
@@ -31,7 +39,7 @@ class _UpdateGatekeeperState extends State<UpdateGatekeeper> {
     if (latestBuild != null && currentBuild < latestBuild) {
       setState(() => _shouldBlock = true);
       await Future.delayed(Duration.zero);
-      await UpdateService.forceUpdateIfAvailable(context);
+      await UpdateService.promptIfVersionMismatch(context);
     }
   }
 

@@ -9,12 +9,12 @@ plugins {
 }
 
 android {
-    namespace = "com.shwapno.survey"
+    namespace = "com.shwapno.survey2"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "28.1.13356709"
 
     defaultConfig {
-        applicationId = "com.shwapno.survey"
+        applicationId = "com.shwapno.survey2"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

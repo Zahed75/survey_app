@@ -1,7 +1,9 @@
-// android/app/src/main/kotlin/.../MainActivity.kt
-package com.shwapno.survey
+// android/app/src/main/kotlin/com/shwapno/survey2/MainActivity.kt
+package com.shwapno.survey2
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -12,40 +14,29 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "shwapno.app/update"
+    private val UPDATE_CHANNEL = "shwapno.app/update"
+    private val MIGRATION_CHANNEL = "app.migration"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        // ---- Updater channel (existing) ----
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, UPDATE_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "installApk" -> {
                         val apkPath = call.argument<String>("apkPath")
                         if (apkPath.isNullOrEmpty()) {
-                            result.error("NO_PATH", "APK path is null/empty", null)
-                            return@setMethodCallHandler
+                            result.error("NO_PATH", "APK path is null/empty", null); return@setMethodCallHandler
                         }
                         try {
-                            // Check install-permission on Android O+
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-                                !packageManager.canRequestPackageInstalls()
-                            ) {
-                                // Tell Dart to open settings
-                                result.error(
-                                    "NO_PERMISSION",
-                                    "User must allow 'Install unknown apps'",
-                                    null
-                                )
+                                !packageManager.canRequestPackageInstalls()) {
+                                result.error("NO_PERMISSION", "User must allow 'Install unknown apps'", null)
                                 return@setMethodCallHandler
                             }
-
                             val file = File(apkPath)
-                            val uri = FileProvider.getUriForFile(
-                                this,
-                                BuildConfig.APPLICATION_ID + ".provider",
-                                file
-                            )
+                            val uri = FileProvider.getUriForFile(this, "$packageName.fileProvider", file)
                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                 setDataAndType(uri, "application/vnd.android.package-archive")
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -58,8 +49,6 @@ class MainActivity : FlutterActivity() {
                             result.error("INSTALL_ERROR", e.localizedMessage, null)
                         }
                     }
-
-                    // NEW: open "Install unknown apps" settings for this app
                     "openUnknownSourcesSettings" -> {
                         try {
                             val intent = Intent(
@@ -72,9 +61,44 @@ class MainActivity : FlutterActivity() {
                             result.error("OPEN_SETTINGS_ERROR", e.localizedMessage, null)
                         }
                     }
-
                     else -> result.notImplemented()
                 }
             }
+
+        // ---- Migration channel (NEW) ----
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MIGRATION_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "isInstalled" -> {
+                        val pkg = call.argument<String>("package")
+                        if (pkg.isNullOrBlank()) { result.success(false); return@setMethodCallHandler }
+                        result.success(isPackageInstalled(pkg))
+                    }
+                    "uninstall" -> {
+                        val pkg = call.argument<String>("package")
+                        if (pkg.isNullOrBlank()) { result.error("NO_PKG", "Missing package", null); return@setMethodCallHandler }
+                        try {
+                            val intent = Intent(Intent.ACTION_DELETE).apply {
+                                data = Uri.parse("package:$pkg")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                            result.success(null)
+                        } catch (e: ActivityNotFoundException) {
+                            result.error("UNINSTALL_ERROR", "Cannot launch uninstaller: ${e.localizedMessage}", null)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun isPackageInstalled(packageName: String): Boolean {
+        return try {
+            packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (_: PackageManager.NameNotFoundException) {
+            false
+        }
     }
 }

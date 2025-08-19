@@ -83,7 +83,7 @@ class _AppRootState extends State<_AppRoot> {
       unawaited(_requestStartupPermissions());
 
       // ✅ Fire-and-forget update prompt. Using root navigator keeps it stable
-      unawaited(UpdateService.forceUpdateIfAvailable(Get.overlayContext ?? context));
+      unawaited(UpdateService.promptIfVersionMismatch(Get.overlayContext ?? context));
     });
   }
 
